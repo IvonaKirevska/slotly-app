@@ -1,4 +1,4 @@
-# BRAND_NAME – salon booking
+# README
 
 A small booking page for a beauty salon (hair, makeup, nails). The host publishes time slots, clients book one with their name, email and service, and a booked slot can't be taken twice.
 
