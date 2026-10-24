@@ -7,3 +7,7 @@ export type Slot={
 };
 
 export type Service = "HAIR" | "MAKEUP" | "NAILS";
+
+export type BookingResult = {
+    message: string;
+};

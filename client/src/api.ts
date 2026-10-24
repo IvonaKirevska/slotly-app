@@ -1,17 +1,20 @@
-import type {Service, Slot} from "./types.ts";
+import type { BookingResult, Service, Slot } from "./types";
 
-async function request<T>(url: string, init?: RequestInit): Promise<T>{
-    const res=await fetch(url, {
-        headers: {"Content-Type": "application/json"},
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
         ...init,
     });
-
-    const body=await res.json().catch(()=>null);
+    const text = await res.text();
+    let body: any = null;
+    try {
+        body = text ? JSON.parse(text) : null;
+    } catch {
+        throw new Error("The server sent an unexpected response.");
+    }
     if (!res.ok) throw new Error(body?.error ?? "Something went wrong.");
     return body as T;
 }
-
-export const getSlots=()=>request<Slot[]>("/api/slots");
 
 export type BookingInput = {
     name: string;
@@ -20,14 +23,13 @@ export type BookingInput = {
     notes: string;
 };
 
-export const bookSlot = (id: number, input: BookingInput) =>
-    request<Slot>(`/api/slots/${id}/book`, {
-        method: "POST",
-        body: JSON.stringify(input),
-    });
+export const getSlots = () => request<Slot[]>("/api/slots");
 
 export const createSlot = (input: { date: string; start: string; duration: number }) =>
-    request<Slot>("/api/slots", {
+    request<Slot>("/api/slots", { method: "POST", body: JSON.stringify(input) });
+
+export const bookSlot = (id: number, input: BookingInput) =>
+    request<BookingResult>(`/api/slots/${id}/book`, {
         method: "POST",
         body: JSON.stringify(input),
     });

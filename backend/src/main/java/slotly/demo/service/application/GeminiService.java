@@ -1,8 +1,9 @@
-
 package slotly.demo.service.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,106 +18,65 @@ import java.util.Map;
 @Service
 public class GeminiService {
 
-    @Value("${GEMINI_API_KEY}")
+    private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
+
+    @Value("${GEMINI_API_KEY:}")
     private String apiKey;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @Value("${GEMINI_MODEL:gemini-3.8-flash}")
+    private String model;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(15))
+            .connectTimeout(Duration.ofSeconds(5))
             .build();
 
-    public String generateConfirmation(
-            String customerName,
-            String serviceName,
-            String date,
-            String time) {
+    /** Never throws: falls back to a plain message so a booking never fails because of the AI. */
+    public String generateConfirmation(String name, String service, String date, String time) {
+        String fallback = "Hi %s, your %s appointment is confirmed for %s at %s. See you then!"
+                .formatted(name, service, date, time);
+
+        if (apiKey.isBlank()) {
+            return fallback;
+        }
 
         try {
             String prompt = """
-                    Write a friendly, short booking confirmation message
-                    for a scheduling application called Slotly.
-
-                    Customer name: %s
+                    Write a warm booking confirmation of 2 sentences for a beauty salon.
+                    Customer: %s
                     Service: %s
-                    Date: %s
-                    Time: %s
+                    When: %s at %s
+                    Use only these details, no emojis, no placeholders.
+                    """.formatted(name, service, date, time);
 
-                    Confirm the appointment using these details.
-                    Do not invent additional information.
-                    Keep the message to 2-3 sentences.
-                    """.formatted(
-                    customerName, serviceName, date, time
-            );
-
-            Map<String, Object> requestBody = Map.of(
-                    "contents", List.of(
-                            Map.of(
-                                    "parts", List.of(
-                                            Map.of("text", prompt)
-                                    )
-                            )
-                    )
-            );
-
-            String jsonBody =
-                    objectMapper.writeValueAsString(requestBody);
+            String body = objectMapper.writeValueAsString(Map.of(
+                    "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt))))));
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(
-                            "https://generativelanguage.googleapis.com/v1beta/"
-                                    + "models/gemini-3.8-flash:generateContent"
-                    ))
-                    .timeout(Duration.ofSeconds(90))
+                    .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/"
+                            + model + ":generateContent"))
+                    .timeout(Duration.ofSeconds(8))
                     .header("Content-Type", "application/json")
                     .header("x-goog-api-key", apiKey)
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
 
-            HttpResponse<String> response = httpClient.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofString()
-            );
-
-            if (response.statusCode() < 200
-                    || response.statusCode() >= 300) {
-                throw new IllegalStateException(
-                        "Gemini API returned HTTP "
-                                + response.statusCode()
-                );
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() / 100 != 2) {
+                log.warn("Gemini returned HTTP {}", response.statusCode());
+                return fallback;
             }
 
-            JsonNode root =
-                    objectMapper.readTree(response.body());
-
-            JsonNode textNode = root.path("candidates")
-                    .path(0)
-                    .path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text");
-
-            if (textNode.isMissingNode()
-                    || textNode.asText().isBlank()) {
-                throw new IllegalStateException(
-                        "Gemini returned no confirmation message."
-                );
-            }
-
-            return textNode.asText();
+            JsonNode text = objectMapper.readTree(response.body())
+                    .path("candidates").path(0).path("content").path("parts").path(0).path("text");
+            return text.asText("").isBlank() ? fallback : text.asText().trim();
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException(
-                    "Gemini request was interrupted."
-            );
+            return fallback;
         } catch (Exception e) {
-            System.err.println("Gemini error: " + e.getMessage());
-            e.printStackTrace();
-
-            throw new IllegalStateException(
-                    "Could not generate the AI confirmation.", e
-            );
+            log.warn("Gemini call failed: {}", e.getMessage());
+            return fallback;
         }
     }
 }

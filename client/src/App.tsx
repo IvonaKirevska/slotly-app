@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getSlots } from "./api";
 import BookingForm from "./components/BookingForm";
 import SlotRow from "./components/SlotRow";
-import type { Slot } from "./types";
+import type { BookingResult, Slot } from "./types";
 import HostPage from "./components/HostPage";
 
 const formatDay = (date: string) =>
@@ -21,7 +21,7 @@ export default function App() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [openId, setOpenId] = useState<number | null>(null);
-    const [confirmed, setConfirmed] = useState<Slot | null>(null);
+    const [confirmed, setConfirmed] = useState<BookingResult | null>(null);
     const [view, setView] = useState<"book" | "host">("book");
 
     const load = () =>
@@ -32,8 +32,8 @@ export default function App() {
 
     useEffect(() => { load(); }, []);
 
-    function handleBooked(slot: Slot) {
-        setConfirmed(slot);
+    function handleBooked(result: BookingResult) {
+        setConfirmed(result);
         setOpenId(null);
         load();
     }
@@ -61,7 +61,7 @@ export default function App() {
 
                     {confirmed && (
                         <p className="notice" role="status">
-                            You're booked for {formatDay(confirmed.date)} at {confirmed.start.slice(0, 5)}. See you then!
+                            {confirmed.message || "Your booking is confirmed. See you soon!"}
                         </p>
                     )}
 

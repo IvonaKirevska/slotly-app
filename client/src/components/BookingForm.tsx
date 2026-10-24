@@ -1,9 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { bookSlot } from "../api";
-import type { Service, Slot } from "../types";
+import type { BookingResult, Service, Slot } from "../types";
 import ServicePicker from "./ServicePicker";
 
-type Props = { slot: Slot; onBooked: (slot: Slot) => void; onDone: () => void };
+type Props = {
+    slot: Slot;
+    onBooked: (result: BookingResult) => void;
+    onDone: () => void;
+};
 
 export default function BookingForm({ slot, onBooked, onDone }: Props) {
     const [name, setName] = useState("");
@@ -21,7 +25,7 @@ export default function BookingForm({ slot, onBooked, onDone }: Props) {
             onBooked(await bookSlot(slot.id, { name, email, service, notes }));
         } catch (err) {
             setError((err as Error).message);
-            onDone(); // reload the list, in case the slot was just taken
+            onDone(); // reload the list in case the slot was just taken
         } finally {
             setBusy(false);
         }
@@ -32,7 +36,7 @@ export default function BookingForm({ slot, onBooked, onDone }: Props) {
             <ServicePicker value={service} onChange={setService} />
             <label>
                 Your name
-                <input value={name} onChange={(e) => setName(e.target.value)} required />
+                <input value={name} maxLength={60} onChange={(e) => setName(e.target.value)} required />
             </label>
             <label>
                 Email
@@ -43,8 +47,8 @@ export default function BookingForm({ slot, onBooked, onDone }: Props) {
                 <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
             </label>
             {error && <p className="error" role="alert">{error}</p>}
-            <button className="btn" disabled={busy || slot.booked}>
-                {busy ? "Booking…" : "Confirm booking"}
+            <button className="btn" disabled={busy}>
+                {busy ? "Confirming your booking…" : "Confirm booking"}
             </button>
         </form>
     );
