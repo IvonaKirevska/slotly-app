@@ -29,7 +29,18 @@ export const createSlot = (input: { date: string; start: string; duration: numbe
     request<Slot>("/api/slots", { method: "POST", body: JSON.stringify(input) });
 
 export const bookSlot = (id: number, input: BookingInput) =>
-    request<BookingResult>(`/api/slots/${id}/book`, {
+    request<Slot>(`/api/slots/${id}/book`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+
+export const getConfirmation = (input: {
+    customerName: string;
+    serviceName: string;
+    date: string;
+    time: string;
+}) =>
+    request<BookingResult>("/api/ai/confirmation", {
         method: "POST",
         body: JSON.stringify(input),
     });

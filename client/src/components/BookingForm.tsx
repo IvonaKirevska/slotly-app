@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { bookSlot } from "../api";
+import {bookSlot, getConfirmation} from "../api";
 import type { BookingResult, Service, Slot } from "../types";
 import ServicePicker from "./ServicePicker";
 
@@ -22,7 +22,27 @@ export default function BookingForm({ slot, onBooked, onDone }: Props) {
         setBusy(true);
         setError("");
         try {
-            onBooked(await bookSlot(slot.id, { name, email, service, notes }));
+            await bookSlot(slot.id, { name, email, service, notes });
+
+            // The booking is saved. The AI message is a bonus, so a failure here is ignored.
+            let message = `Thanks ${name}, your appointment is confirmed. See you soon!`;
+            try {
+                const ai = await getConfirmation({
+                    customerName: name,
+                    serviceName: service.toLowerCase(),
+                    date: new Date(slot.date + "T00:00").toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                    }),
+                    time: slot.start.slice(0, 5),
+                });
+                if (ai.message) message = ai.message;
+            } catch {
+                /* keep the fallback message */
+            }
+
+            onBooked({ message });
         } catch (err) {
             setError((err as Error).message);
             onDone(); // reload the list in case the slot was just taken
