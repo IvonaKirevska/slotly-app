@@ -4,6 +4,7 @@ import BookingForm from "./components/BookingForm";
 import SlotRow from "./components/SlotRow";
 import type { BookingResult, Slot } from "./types";
 import HostPage from "./components/HostPage";
+import ServiceCards from "./components/ServiceCards.tsx";
 
 const formatDay = (date: string) =>
     new Date(date + "T00:00").toLocaleDateString(undefined, {
@@ -23,6 +24,14 @@ export default function App() {
     const [openId, setOpenId] = useState<number | null>(null);
     const [confirmed, setConfirmed] = useState<BookingResult | null>(null);
     const [view, setView] = useState<"book" | "host">("book");
+    const dateParts = (date: string) => {
+        const d = new Date(date + "T00:00");
+        return {
+            dow: d.toLocaleDateString(undefined, { weekday: "short" }),
+            dom: d.getDate(),
+            mon: d.toLocaleDateString(undefined, { month: "short" }),
+        };
+    };
 
     const load = () =>
         getSlots()
@@ -41,12 +50,21 @@ export default function App() {
     if (loading) return <p>Loading slots…</p>;
     if (error) return <p>{error}</p>;
 
+    const next = slots.find((s) => !s.booked);
+
     return (
         <main>
-            <nav className="tabs">
-                <button className="chip" aria-pressed={view === "book"} onClick={() => setView("book")}>Book</button>
-                <button className="chip" aria-pressed={view === "host"} onClick={() => setView("host")}>Host</button>
-            </nav>
+            <header className="topbar">
+                <span className="brand">Slotly</span>
+                <nav className="menu" aria-label="Main">
+                    <button aria-current={view === "book" ? "page" : undefined} onClick={() => setView("book")}>
+                        Book
+                    </button>
+                    <button aria-current={view === "host" ? "page" : undefined} onClick={() => setView("host")}>
+                        Host
+                    </button>
+                </nav>
+            </header>
 
             {view === "host" ? (
                 <>
@@ -56,8 +74,17 @@ export default function App() {
                 </>
             ) : (
                 <>
-                    <h1>Book your appointment</h1>
-                    <p className="lede">Pick a time, then choose your service.</p>
+                    <header className="hero">
+                        <h1>Beauty Studio</h1>
+                        <p className="lede">Hair, makeup and nails, booked in a minute. Pick a time that suits you.</p>
+                        {next && (
+                            <p className="next">
+                                Next free: {formatDay(next.date)} at {next.start.slice(0, 5)}
+                            </p>
+                        )}
+                    </header>
+
+                    <ServiceCards />
 
                     {confirmed && (
                         <p className="notice" role="status">
@@ -67,21 +94,30 @@ export default function App() {
 
                     {slots.length === 0 && <p>No slots yet. Check back soon.</p>}
 
-                    {Object.entries(groupByDate(slots)).map(([date, daySlots]) => (
-                        <section key={date}>
-                            <h2>{formatDay(date)}</h2>
-                            {daySlots.map((slot) => (
-                                <SlotRow
-                                    key={slot.id}
-                                    slot={slot}
-                                    open={openId === slot.id}
-                                    onToggle={() => { setConfirmed(null); setOpenId(openId === slot.id ? null : slot.id); }}
-                                >
-                                    <BookingForm slot={slot} onBooked={handleBooked} onDone={load} />
-                                </SlotRow>
-                            ))}
-                        </section>
-                    ))}
+                    {Object.entries(groupByDate(slots)).map(([date, daySlots]) => {
+                        const p = dateParts(date);
+                        return (
+                            <section key={date} className="day" aria-label={formatDay(date)}>
+                                <div className="date-badge">
+                                    <span>{p.dow}</span>
+                                    <strong>{p.dom}</strong>
+                                    <span>{p.mon}</span>
+                                </div>
+                                <div className="day-slots">
+                                    {daySlots.map((slot) => (
+                                        <SlotRow
+                                            key={slot.id}
+                                            slot={slot}
+                                            open={openId === slot.id}
+                                            onToggle={() => { setConfirmed(null); setOpenId(openId === slot.id ? null : slot.id); }}
+                                        >
+                                            <BookingForm slot={slot} onBooked={handleBooked} onDone={load} />
+                                        </SlotRow>
+                                    ))}
+                                </div>
+                            </section>
+                        );
+                    })}
                 </>
             )}
         </main>

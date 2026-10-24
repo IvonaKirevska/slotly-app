@@ -55,7 +55,7 @@ public class GeminiService {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create("https://generativelanguage.googleapis.com/v1beta/models/"
                             + model + ":generateContent"))
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(90))
                     .header("Content-Type", "application/json")
                     .header("x-goog-api-key", apiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(body))
