@@ -1,0 +1,51 @@
+import { useState, type FormEvent } from "react";
+import { bookSlot } from "../api";
+import type { Service, Slot } from "../types";
+import ServicePicker from "./ServicePicker";
+
+type Props = { slot: Slot; onBooked: (slot: Slot) => void; onDone: () => void };
+
+export default function BookingForm({ slot, onBooked, onDone }: Props) {
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [service, setService] = useState<Service>("HAIR");
+    const [notes, setNotes] = useState("");
+    const [error, setError] = useState("");
+    const [busy, setBusy] = useState(false);
+
+    async function submit(e: FormEvent) {
+        e.preventDefault();
+        setBusy(true);
+        setError("");
+        try {
+            onBooked(await bookSlot(slot.id, { name, email, service, notes }));
+        } catch (err) {
+            setError((err as Error).message);
+            onDone(); // reload the list, in case the slot was just taken
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <form className="booking" onSubmit={submit}>
+            <ServicePicker value={service} onChange={setService} />
+            <label>
+                Your name
+                <input value={name} onChange={(e) => setName(e.target.value)} required />
+            </label>
+            <label>
+                Email
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </label>
+            <label>
+                Note (optional)
+                <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </label>
+            {error && <p className="error" role="alert">{error}</p>}
+            <button className="btn" disabled={busy || slot.booked}>
+                {busy ? "Booking…" : "Confirm booking"}
+            </button>
+        </form>
+    );
+}

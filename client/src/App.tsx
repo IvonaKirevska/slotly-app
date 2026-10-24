@@ -1,122 +1,89 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect, useState } from "react";
+import { getSlots } from "./api";
+import BookingForm from "./components/BookingForm";
+import SlotRow from "./components/SlotRow";
+import type { Slot } from "./types";
+import HostPage from "./components/HostPage";
 
-function App() {
-  const [count, setCount] = useState(0)
+const formatDay = (date: string) =>
+    new Date(date + "T00:00").toLocaleDateString(undefined, {
+        weekday: "long", month: "long", day: "numeric",
+    });
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function groupByDate(slots: Slot[]) {
+    const groups: Record<string, Slot[]> = {};
+    for (const slot of slots) (groups[slot.date] ??= []).push(slot);
+    return groups;
 }
 
-export default App
+export default function App() {
+    const [slots, setSlots] = useState<Slot[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [openId, setOpenId] = useState<number | null>(null);
+    const [confirmed, setConfirmed] = useState<Slot | null>(null);
+    const [view, setView] = useState<"book" | "host">("book");
+
+    const load = () =>
+        getSlots()
+            .then(setSlots)
+            .catch((e: Error) => setError(e.message))
+            .finally(() => setLoading(false));
+
+    useEffect(() => { load(); }, []);
+
+    function handleBooked(slot: Slot) {
+        setConfirmed(slot);
+        setOpenId(null);
+        load();
+    }
+
+    if (loading) return <p>Loading slots…</p>;
+    if (error) return <p>{error}</p>;
+
+    return (
+        <main>
+            <nav className="tabs">
+                <button className="chip" aria-pressed={view === "book"} onClick={() => setView("book")}>Book</button>
+                <button className="chip" aria-pressed={view === "host"} onClick={() => setView("host")}>Host</button>
+            </nav>
+
+            {view === "host" ? (
+                <>
+                    <h1>Publish your availability</h1>
+                    <p className="lede">Add the times clients can book.</p>
+                    <HostPage slots={slots} onChanged={load} />
+                </>
+            ) : (
+                <>
+                    <h1>Book your appointment</h1>
+                    <p className="lede">Pick a time, then choose your service.</p>
+
+                    {confirmed && (
+                        <p className="notice" role="status">
+                            You're booked for {formatDay(confirmed.date)} at {confirmed.start.slice(0, 5)}. See you then!
+                        </p>
+                    )}
+
+                    {slots.length === 0 && <p>No slots yet. Check back soon.</p>}
+
+                    {Object.entries(groupByDate(slots)).map(([date, daySlots]) => (
+                        <section key={date}>
+                            <h2>{formatDay(date)}</h2>
+                            {daySlots.map((slot) => (
+                                <SlotRow
+                                    key={slot.id}
+                                    slot={slot}
+                                    open={openId === slot.id}
+                                    onToggle={() => { setConfirmed(null); setOpenId(openId === slot.id ? null : slot.id); }}
+                                >
+                                    <BookingForm slot={slot} onBooked={handleBooked} onDone={load} />
+                                </SlotRow>
+                            ))}
+                        </section>
+                    ))}
+                </>
+            )}
+        </main>
+    );
+}
