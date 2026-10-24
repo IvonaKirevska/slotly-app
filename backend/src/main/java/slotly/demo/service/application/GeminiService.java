@@ -28,7 +28,7 @@ public class GeminiService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
+            .connectTimeout(Duration.ofSeconds(10))
             .build();
 
     /** Never throws: falls back to a plain message so a booking never fails because of the AI. */
